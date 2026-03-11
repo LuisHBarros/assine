@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: assine-fiscal
+  datasource:
+    url: jdbc:postgresql://postgres-fiscal:5432/fiscal
+    username: assine
+    password: assine
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: assine
+    password: assine
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+nuvem:
+  fiscal:
+    client-id: ${NUVEM_FISCAL_CLIENT_ID}
+    client-secret: ${NUVEM_FISCAL_CLIENT_SECRET}
+    environment: ${NUVEM_FISCAL_ENVIRONMENT:sandbox}
+    base-url: https://api.nuvemfiscal.com.br
+
+invoice:
+  retry:
+    max-attempts: 5
+    backoff-initial: 1000  # 1 segundo
+    backoff-multiplier: 2
