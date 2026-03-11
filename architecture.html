@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assine — Arquitetura</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0f1e;
+      font-family: 'IBM Plex Sans', sans-serif;
+      color: #c8d8f0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* dot grid background */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: radial-gradient(circle, rgba(74,158,255,0.15) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    header {
+      position: relative; z-index: 10;
+      padding: 28px 48px 12px;
+      display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid rgba(74,158,255,0.15);
+    }
+    header .logo {
+      width: 32px; height: 32px;
+      background: #0078d4;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    header h1 {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 18px; font-weight: 600;
+      color: #e8f4ff;
+      letter-spacing: 0.05em;
+    }
+    header span {
+      font-size: 12px; color: #4a9eff;
+      font-family: 'IBM Plex Mono', monospace;
+      margin-left: auto;
+    }
+
+    .canvas {
+      position: relative; z-index: 1;
+      width: 100%;
+      padding: 40px 48px 60px;
+    }
+
+    svg#lines {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* ── Groups ── */
+    .group {
+      position: absolute;
+      border: 1.5px dashed;
+      border-radius: 8px;
+      padding-top: 30px;
+    }
+    .group-label {
+      position: absolute;
+      top: 8px; left: 14px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.08em;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .group.internal   { border-color: rgba(0,120,212,0.5);  background: rgba(0,120,212,0.04); }
+    .group.internal .group-label { color: #4a9eff; }
+
+    .group.queue      { border-color: rgba(255,152,0,0.4);  background: rgba(255,152,0,0.04); }
+    .group.queue .group-label { color: #ffb74d; }
+
+    .group.external   { border-color: rgba(156,39,176,0.4); background: rgba(156,39,176,0.04); }
+    .group.external .group-label { color: #ce93d8; }
+
+    /* ── Nodes ── */
+    .node {
+      position: absolute;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 6px;
+      cursor: default;
+      z-index: 5;
+    }
+
+    .node-box {
+      width: 64px; height: 64px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+      position: relative;
+    }
+    .node:hover .node-box {
+      transform: translateY(-3px) scale(1.06);
+    }
+
+    .node-label {
+      font-size: 10.5px; font-weight: 600;
+      text-align: center; line-height: 1.3;
+      max-width: 80px;
+      color: #c8d8f0;
+    }
+    .node-sub {
+      font-size: 9px; color: #5a7fa8;
+      text-align: center;
+      font-family: 'IBM Plex Mono', monospace;
+      max-width: 80px; line-height: 1.3;
+    }
+
+    /* color variants */
+    .blue  .node-box { background: #0078d4; box-shadow: 0 4px 20px rgba(0,120,212,0.35); }
+    .cyan  .node-box { background: #0891b2; box-shadow: 0 4px 20px rgba(8,145,178,0.35); }
+    .teal  .node-box { background: #0d7377; box-shadow: 0 4px 20px rgba(13,115,119,0.35); }
+    .green .node-box { background: #15803d; box-shadow: 0 4px 20px rgba(21,128,61,0.35); }
+    .amber .node-box { background: #b45309; box-shadow: 0 4px 20px rgba(180,83,9,0.4); }
+    .violet.node-box,.violet .node-box { background: #6d28d9; box-shadow: 0 4px 20px rgba(109,40,217,0.35); }
+    .purple.node-box,.purple .node-box { background: #7e22ce; box-shadow: 0 4px 20px rgba(126,34,206,0.35); }
+    .slate .node-box { background: #1e3a5f; box-shadow: 0 4px 20px rgba(30,58,95,0.4); border: 1px solid #2a5080; }
+
+    /* gateway special */
+    .gateway .node-box {
+      width: 72px; height: 72px; font-size: 30px;
+      background: linear-gradient(135deg, #0050a0, #0078d4);
+      box-shadow: 0 6px 28px rgba(0,120,212,0.5);
+      border: 1px solid rgba(74,158,255,0.4);
+    }
+
+    /* tooltip */
+    .node:hover .tooltip { opacity: 1; pointer-events: auto; transform: translateY(0); }
+    .tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%; transform: translate(-50%, 6px);
+      background: #0d1b2e;
+      border: 1px solid rgba(74,158,255,0.3);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 10px; line-height: 1.5;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s, transform 0.15s;
+      z-index: 20;
+      color: #a8c8e8;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .tooltip b { color: #4a9eff; display: block; margin-bottom: 2px; }
+
+    /* legend */
+    .legend {
+      position: relative; z-index: 10;
+      display: flex; gap: 24px; flex-wrap: wrap;
+      padding: 16px 48px 24px;
+      border-top: 1px solid rgba(74,158,255,0.1);
+    }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #5a7fa8; }
+    .legend-line {
+      width: 28px; height: 2px;
+      border-radius: 1px;
+    }
+    .l-http   { background: #4a9eff; }
+    .l-event  { background: #ffb74d; border: none; height: 0; border-top: 2px dashed #ffb74d; }
+    .l-sync   { background: #4caf50; }
+
+    /* SVG line styles */
+    .line-http  { stroke: #2a6aaa; stroke-width: 1.5; fill: none; marker-end: url(#arrowBlue); }
+    .line-event { stroke: #7a5000; stroke-width: 1.5; fill: none; stroke-dasharray: 5,3; marker-end: url(#arrowAmber); }
+    .line-sync  { stroke: #1a5530; stroke-width: 1.5; fill: none; marker-end: url(#arrowGreen); }
+
+    /* clickable node */
+    .node { cursor: pointer; }
+    .node-box { cursor: pointer; }
+    .node.active .node-box {
+      outline: 2px solid #4a9eff;
+      outline-offset: 3px;
+      transform: translateY(-3px) scale(1.08);
+    }
+
+    /* ── Dialog overlay ── */
+    #dialog-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(5, 10, 25, 0.72);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #dialog-overlay.open { display: flex; }
+
+    #dialog {
+      background: #0d1b2e;
+      border: 1px solid rgba(74,158,255,0.25);
+      border-radius: 14px;
+      width: 520px;
+      max-width: 94vw;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(74,158,255,0.08);
+      animation: dialogIn 0.22s cubic-bezier(.22,1,.36,1);
+    }
+    @keyframes dialogIn {
+      from { opacity:0; transform: scale(0.93) translateY(12px); }
+      to   { opacity:1; transform: scale(1)    translateY(0);    }
+    }
+
+    .dialog-header {
+      padding: 22px 24px 16px;
+      border-bottom: 1px solid rgba(74,158,255,0.1);
+      display: flex; align-items: center; gap: 14px;
+    }
+    .dialog-icon {
+      width: 52px; height: 52px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    .dialog-title { flex: 1; }
+    .dialog-title h2 {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 15px; font-weight: 600;
+      color: #e8f4ff; letter-spacing: 0.04em;
+    }
+    .dialog-title p {
+      font-size: 11px; color: #4a7fa8;
+      margin-top: 3px;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .dialog-close {
+      background: none; border: none; cursor: pointer;
+      color: #3a5a7a; font-size: 20px; line-height: 1;
+      padding: 4px 6px; border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .dialog-close:hover { color: #e8f4ff; background: rgba(74,158,255,0.1); }
+
+    .dialog-body { padding: 20px 24px 24px; }
+
+    .conn-section { margin-bottom: 20px; }
+    .conn-section:last-child { margin-bottom: 0; }
+
+    .conn-section-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .conn-section-title.http   { color: #4a9eff; }
+    .conn-section-title.event  { color: #ffb74d; }
+    .conn-section-title.sync   { color: #4caf50; }
+    .conn-section-title.ext    { color: #ce93d8; }
+
+    .conn-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+      transition: background 0.15s;
+    }
+    .conn-item:hover { background: rgba(74,158,255,0.06); }
+    .conn-item:last-child { margin-bottom: 0; }
+
+    .conn-arrow {
+      font-size: 16px; margin-top: 1px; flex-shrink: 0;
+    }
+    .conn-text { flex: 1; }
+    .conn-target {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px; font-weight: 600;
+      color: #c8d8f0;
+    }
+    .conn-target .badge {
+      display: inline-block;
+      font-size: 9px; padding: 1px 6px;
+      border-radius: 4px; margin-left: 6px;
+      vertical-align: middle; font-weight: 400;
+    }
+    .badge-http  { background: rgba(74,158,255,0.15); color: #4a9eff; }
+    .badge-event { background: rgba(255,183,77,0.15); color: #ffb74d; }
+    .badge-sync  { background: rgba(76,175,80,0.15);  color: #4caf50; }
+    .badge-ext   { background: rgba(206,147,216,0.15);color: #ce93d8; }
+
+    .conn-desc {
+      font-size: 11px; color: #5a7fa8;
+      margin-top: 3px; line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">☁</div>
+  <h1>Assine / Arquitetura de Serviços</h1>
+  <span>microservices · hexagonal · event-driven</span>
+</header>
+
+<!-- CANVAS -->
+<div class="canvas" id="canvas" style="height:920px;">
+
+  <svg id="lines"></svg>
+
+  <!-- ═══════════ GRUPOS ═══════════ -->
+
+  <!-- Internal Services -->
+  <div class="group internal" style="left:160px;top:50px;width:830px;height:680px;">
+    <div class="group-label">☁ Serviços Internos</div>
+  </div>
+
+  <!-- RabbitMQ -->
+  <div class="group queue" style="left:1030px;top:50px;width:260px;height:680px;">
+    <div class="group-label">📨 RabbitMQ</div>
+  </div>
+
+  <!-- External APIs -->
+  <div class="group external" style="left:1330px;top:50px;width:310px;height:680px;">
+    <div class="group-label">☁ APIs Externas</div>
+  </div>
+
+  <!-- ═══════════ NODES ═══════════ -->
+
+  <!-- CLIENT -->
+  <div class="node slate" id="n-client" style="left:18px;top:88px;">
+    <div class="node-box">🌐</div>
+    <div class="node-label">Cliente</div>
+    <div class="node-sub">Browser</div>
+    <div class="tooltip"><b>Cliente</b>Browser / App</div>
+  </div>
+
+  <!-- GATEWAY -->
+  <div class="node gateway blue" id="n-gateway" style="left:192px;top:80px;">
+    <div class="node-box">🔀</div>
+    <div class="node-label">assine-gateway</div>
+    <div class="node-sub">:8080</div>
+    <div class="tooltip"><b>assine-gateway :8080</b>JWT RS256 · Rate Limiting<br>Correlation ID · Routing</div>
+  </div>
+
+  <!-- AUTH -->
+  <div class="node cyan" id="n-auth" style="left:360px;top:88px;">
+    <div class="node-box">🔑</div>
+    <div class="node-label">assine-auth</div>
+    <div class="node-sub">:8086</div>
+    <div class="tooltip"><b>assine-auth :8086</b>Magic Link · Google OAuth2<br>JWT RS256 · JWKS</div>
+  </div>
+
+  <!-- SUBSCRIPTIONS -->
+  <div class="node blue" id="n-sub" style="left:540px;top:200px;">
+    <div class="node-box">📋</div>
+    <div class="node-label">assine-subscriptions</div>
+    <div class="node-sub">:8081</div>
+    <div class="tooltip"><b>assine-subscriptions :8081</b>Core do Domínio<br>Planos · Assinaturas · Estados</div>
+  </div>
+
+  <!-- BILLING -->
+  <div class="node blue" id="n-bill" style="left:360px;top:310px;">
+    <div class="node-box">💳</div>
+    <div class="node-label">assine-billing</div>
+    <div class="node-sub">:8082</div>
+    <div class="tooltip"><b>assine-billing :8082</b>Stripe Webhooks<br>Outbox Pattern · Reembolsos</div>
+  </div>
+
+  <!-- ACCESS -->
+  <div class="node teal" id="n-acc" style="left:720px;top:200px;">
+    <div class="node-box">🔒</div>
+    <div class="node-label">assine-access</div>
+    <div class="node-sub">:8083</div>
+    <div class="tooltip"><b>assine-access :8083</b>Permissões de Acesso<br>AccessPermission · Revogação</div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="node teal" id="n-cont" style="left:540px;top:430px;">
+    <div class="node-box">📓</div>
+    <div class="node-label">assine-content</div>
+    <div class="node-sub">:8087</div>
+    <div class="tooltip"><b>assine-content :8087</b>Scheduler 07h<br>Notion → HTML</div>
+  </div>
+
+  <!-- FISCAL -->
+  <div class="node blue" id="n-fis" style="left:360px;top:540px;">
+    <div class="node-box">🧾</div>
+    <div class="node-label">assine-fiscal</div>
+    <div class="node-sub">:8085</div>
+    <div class="tooltip"><b>assine-fiscal :8085</b>NFS-e · Nuvem Fiscal<br>Outbox · Retry Exponencial</div>
+  </div>
+
+  <!-- NOTIFICATIONS -->
+  <div class="node blue" id="n-not" style="left:720px;top:430px;">
+    <div class="node-box">📧</div>
+    <div class="node-label">assine-notifications</div>
+    <div class="node-sub">:8084</div>
+    <div class="tooltip"><b>assine-notifications :8084</b>Email Templates · SendGrid<br>Lotes de 50 · Scheduler</div>
+  </div>
+
+  <!-- MINIO -->
+  <div class="node slate" id="n-minio" style="left:720px;top:590px;">
+    <div class="node-box">🗄️</div>
+    <div class="node-label">MinIO</div>
+    <div class="node-sub">:9000</div>
+    <div class="tooltip"><b>MinIO :9000</b>S3-compatível<br>Bucket: invoices · PDFs NFS-e</div>
+  </div>
+
+  <!-- ═══ RabbitMQ queues ═══ -->
+  <div class="node amber" id="n-q1" style="left:1055px;top:100px;">
+    <div class="node-box" style="background:#92400e;box-shadow:0 4px 20px rgba(146,64,14,0.4);">📨</div>
+    <div class="node-label">payment.*</div>
+    <div class="node-sub">assine.payment</div>
+    <div class="tooltip"><b>assine.payment.*</b>PaymentConfirmed<br>PaymentFailed<br>ChargebackOpened<br>SubscriptionRefundRequested</div>
+  </div>
+
+  <div class="node amber" id="n-q2" style="left:1055px;top:240px;">
+    <div class="node-box" style="background:#92400e;box-shadow:0 4px 20px rgba(146,64,14,0.4);">📬</div>
+    <div class="node-label">subscription.*</div>
+    <div class="node-sub">assine.subscription</div>
+    <div class="tooltip"><b>assine.subscription.*</b>Created · Activated<br>Canceled · PastDue<br>Reactivated · CancellationScheduled</div>
+  </div>
+
+  <div class="node amber" id="n-q3" style="left:1055px;top:410px;">
+    <div class="node-box" style="background:#92400e;box-shadow:0 4px 20px rgba(146,64,14,0.4);">🧾</div>
+    <div class="node-label">invoice.*</div>
+    <div class="node-sub">assine.invoice</div>
+    <div class="tooltip"><b>assine.invoice.*</b>InvoiceIssued<br>InvoiceFailed</div>
+  </div>
+
+  <div class="node amber" id="n-q4" style="left:1055px;top:560px;">
+    <div class="node-box" style="background:#92400e;box-shadow:0 4px 20px rgba(146,64,14,0.4);">🔗</div>
+    <div class="node-label">auth.*</div>
+    <div class="node-sub">assine.auth</div>
+    <div class="tooltip"><b>assine.auth.*</b>MagicLinkRequested</div>
+  </div>
+
+  <!-- ═══ External APIs ═══ -->
+  <div class="node violet" id="n-stripe" style="left:1360px;top:88px;">
+    <div class="node-box" style="background:#6d28d9;box-shadow:0 4px 20px rgba(109,40,217,0.4);">💳</div>
+    <div class="node-label">Stripe</div>
+    <div class="node-sub">Cartão · Pix</div>
+    <div class="tooltip"><b>Stripe</b>PaymentIntent · Pix<br>Webhooks HMAC-SHA256</div>
+  </div>
+
+  <div class="node violet" id="n-google" style="left:1360px;top:220px;">
+    <div class="node-box" style="background:#1565c0;box-shadow:0 4px 20px rgba(21,101,192,0.4);">🔑</div>
+    <div class="node-label">Google OAuth2</div>
+    <div class="node-sub">openid · email</div>
+    <div class="tooltip"><b>Google OAuth2</b>openid · email · profile<br>Token · UserInfo API</div>
+  </div>
+
+  <div class="node violet" id="n-sendgrid" style="left:1360px;top:350px;">
+    <div class="node-box" style="background:#0f766e;box-shadow:0 4px 20px rgba(15,118,110,0.4);">📧</div>
+    <div class="node-label">SendGrid</div>
+    <div class="node-sub">Transactional</div>
+    <div class="tooltip"><b>SendGrid</b>Transactional Email<br>Templates · Bulk</div>
+  </div>
+
+  <div class="node violet" id="n-notion" style="left:1520px;top:88px;">
+    <div class="node-box" style="background:#374151;box-shadow:0 4px 20px rgba(55,65,81,0.5);">📓</div>
+    <div class="node-label">Notion API</div>
+    <div class="node-sub">Database</div>
+    <div class="tooltip"><b>Notion API</b>Database · Blocos<br>Conteúdo da newsletter</div>
+  </div>
+
+  <div class="node violet" id="n-nuvem" style="left:1520px;top:220px;">
+    <div class="node-box" style="background:#7e22ce;box-shadow:0 4px 20px rgba(126,34,206,0.4);">🧾</div>
+    <div class="node-label">Nuvem Fiscal</div>
+    <div class="node-sub">NFS-e</div>
+    <div class="tooltip"><b>Nuvem Fiscal</b>NFS-e · Sandbox<br>Emissão · Cancelamento</div>
+  </div>
+
+</div><!-- /canvas -->
+
+<!-- DIALOG -->
+<div id="dialog-overlay">
+  <div id="dialog">
+    <div class="dialog-header">
+      <div class="dialog-icon" id="d-icon"></div>
+      <div class="dialog-title">
+        <h2 id="d-title"></h2>
+        <p id="d-sub"></p>
+      </div>
+      <button class="dialog-close" id="d-close">✕</button>
+    </div>
+    <div class="dialog-body" id="d-body"></div>
+  </div>
+</div>
+
+<!-- LEGEND -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-line l-http"></div> HTTP (gateway → serviços)</div>
+  <div class="legend-item"><div class="legend-line" style="height:0;border-top:2px dashed #ffb74d;width:28px;"></div> Eventos RabbitMQ</div>
+  <div class="legend-item"><div class="legend-line l-sync"></div> HTTP interno (sync)</div>
+  <div class="legend-item"><div class="legend-line" style="background:#9c27b0;"></div> Integração externa</div>
+</div>
+
+<script>
+  // ═══════════════════════════════════════════════
+  // CONNECTION DATA — one entry per node
+  // ═══════════════════════════════════════════════
+  const NODE_DATA = {
+    'n-client': {
+      icon: '🌐', title: 'Cliente / Browser', sub: 'Ponto de entrada do sistema',
+      iconBg: '#1e3a5f',
+      connections: [
+        { type:'http', arrow:'→', target:'assine-gateway :8080', badge:'HTTP',
+          desc:'Toda requisição do usuário passa pelo gateway via HTTPS. O gateway valida o JWT e roteia para os serviços internos.' }
+      ]
+    },
+    'n-gateway': {
+      icon: '🔀', title: 'assine-gateway', sub: ':8080 · JWT RS256 · Rate Limiting · Correlation ID',
+      iconBg: 'linear-gradient(135deg,#0050a0,#0078d4)',
+      connections: [
+        { type:'http', arrow:'←', target:'Cliente / Browser', badge:'HTTP',
+          desc:'Recebe todas as requisições externas e valida o JWT RS256 via JWKS do assine-auth.' },
+        { type:'http', arrow:'→', target:'assine-auth :8086', badge:'HTTP',
+          desc:'Roteia endpoints de autenticação (/auth/*) e valida tokens consultando o JWKS endpoint.' },
+        { type:'http', arrow:'→', target:'assine-subscriptions :8081', badge:'HTTP',
+          desc:'Roteia requisições autenticadas de planos e assinaturas, propagando X-User-Id e X-User-Role.' },
+        { type:'http', arrow:'→', target:'assine-billing :8082', badge:'HTTP',
+          desc:'Roteia endpoints de pagamento e webhook do Stripe (protegido por HMAC, não por JWT).' },
+        { type:'http', arrow:'→', target:'assine-access :8083', badge:'HTTP',
+          desc:'Roteia consultas de permissão de acesso ao conteúdo.' },
+        { type:'http', arrow:'→', target:'assine-fiscal :8085', badge:'HTTP',
+          desc:'Roteia consultas de notas fiscais do usuário autenticado.' }
+      ]
+    },
+    'n-auth': {
+      icon: '🔑', title: 'assine-auth', sub: ':8086 · Magic Link · Google OAuth2 · JWKS',
+      iconBg: '#0891b2',
+      connections: [
+        { type:'http', arrow:'←', target:'assine-gateway :8080', badge:'HTTP',
+          desc:'Recebe requisições de autenticação roteadas pelo gateway.' },
+        { type:'ext', arrow:'→', target:'Google OAuth2 API', badge:'EXTERNA',
+          desc:'Troca o authorization code por access token e busca o perfil do usuário (email, nome) via UserInfo API.' },
+        { type:'event', arrow:'→', target:'assine.auth.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Publica MagicLinkRequested após gerar o token, consumido pelo assine-notifications para enviar o email com o link.' }
+      ]
+    },
+    'n-sub': {
+      icon: '📋', title: 'assine-subscriptions', sub: ':8081 · Core do Domínio · Planos · Estados',
+      iconBg: '#0078d4',
+      connections: [
+        { type:'http', arrow:'←', target:'assine-gateway :8080', badge:'HTTP',
+          desc:'Recebe requisições de criação, consulta e cancelamento de assinaturas.' },
+        { type:'sync', arrow:'←', target:'assine-billing :8082', badge:'SYNC',
+          desc:'Fornece a data de ativação da assinatura (GET /subscriptions/{id}/activation-date) para cálculo de reembolso progressivo.' },
+        { type:'sync', arrow:'←', target:'assine-fiscal :8085', badge:'SYNC',
+          desc:'Fornece dados fiscais do tomador (nome, CPF/CNPJ, endereço) via GET /subscriptions/{userId}/fiscal-data para emissão da NFS-e.' },
+        { type:'sync', arrow:'←', target:'assine-notifications :8084', badge:'SYNC',
+          desc:'Fornece emails dos assinantes (GET /users/emails) para o envio da newsletter diária.' },
+        { type:'event', arrow:'←', target:'assine.payment.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Consome PaymentConfirmed para ativar a assinatura (PENDING → ACTIVE) e PaymentFailed para marcar PAST_DUE.' },
+        { type:'event', arrow:'→', target:'assine.subscription.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Publica SubscriptionActivated, SubscriptionCanceled, SubscriptionPastDue, SubscriptionReactivated e SubscriptionCancellationScheduled.' }
+      ]
+    },
+    'n-bill': {
+      icon: '💳', title: 'assine-billing', sub: ':8082 · Stripe · Outbox Pattern · Reembolsos',
+      iconBg: '#0078d4',
+      connections: [
+        { type:'http', arrow:'←', target:'assine-gateway :8080', badge:'HTTP',
+          desc:'Recebe requisições de pagamento (PaymentIntent, Pix) e o webhook do Stripe protegido por HMAC-SHA256.' },
+        { type:'sync', arrow:'→', target:'assine-subscriptions :8081', badge:'SYNC',
+          desc:'Busca a data de ativação da assinatura (activation-date) para calcular o reembolso progressivo via RefundCalculator.' },
+        { type:'ext', arrow:'↔', target:'Stripe', badge:'EXTERNA',
+          desc:'Cria PaymentIntents, cobranças Pix, processa reembolsos e recebe webhooks granulares por tentativa de cobrança (invoice.payment_succeeded, invoice.payment_failed, charge.dispute.created).' },
+        { type:'event', arrow:'→', target:'assine.payment.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Publica PaymentConfirmed, PaymentFailed, ChargebackOpened e SubscriptionRefundRequested via Outbox Pattern — garantindo atomicidade entre a persistência e a publicação do evento.' },
+        { type:'event', arrow:'←', target:'assine.subscription.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Consome SubscriptionRefundRequested para iniciar o fluxo de cancelamento por reembolso.' }
+      ]
+    },
+    'n-acc': {
+      icon: '🔒', title: 'assine-access', sub: ':8083 · Permissões · AccessPermission · Revogação',
+      iconBg: '#0d7377',
+      connections: [
+        { type:'http', arrow:'←', target:'assine-gateway :8080', badge:'HTTP',
+          desc:'Recebe consultas de permissão de acesso ao conteúdo protegido.' },
+        { type:'sync', arrow:'←', target:'assine-notifications :8084', badge:'SYNC',
+          desc:'Fornece a lista de userIds com acesso ativo à newsletter (GET /access/subscribers) para o envio diário às 7h.' },
+        { type:'event', arrow:'←', target:'assine.subscription.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Consome SubscriptionActivated para criar AccessPermission e SubscriptionCanceled/SubscriptionPastDue para revogar o acesso (revoked_at = now()).' }
+      ]
+    },
+    'n-cont': {
+      icon: '📓', title: 'assine-content', sub: ':8087 · Scheduler 07h · Notion → HTML',
+      iconBg: '#0d7377',
+      connections: [
+        { type:'sync', arrow:'←', target:'assine-notifications :8084', badge:'SYNC',
+          desc:'Fornece o conteúdo do dia (GET /content/today) às 7h. Se retornar 404 ou erro, o fluxo de newsletter é encerrado e a métrica content.fetch.failed é incrementada.' },
+        { type:'ext', arrow:'→', target:'Notion API', badge:'EXTERNA',
+          desc:'Busca a entrada do Database Notion com Date = hoje e Status = Pronto, converte os blocos nativos (paragraph, headings, listas) para HTML.' }
+      ]
+    },
+    'n-fis': {
+      icon: '🧾', title: 'assine-fiscal', sub: ':8085 · NFS-e · Outbox · Retry Exponencial',
+      iconBg: '#0078d4',
+      connections: [
+        { type:'http', arrow:'←', target:'assine-gateway :8080', badge:'HTTP',
+          desc:'Recebe consultas de notas fiscais do usuário autenticado (/invoices/me).' },
+        { type:'sync', arrow:'→', target:'assine-subscriptions :8081', badge:'SYNC',
+          desc:'Busca dados do tomador (nome, CPF/CNPJ, endereço) para preencher a NFS-e antes de emitir.' },
+        { type:'sync', arrow:'→', target:'MinIO :9000', badge:'SYNC',
+          desc:'Faz upload do PDF da NFS-e após a emissão (invoices/{invoiceId}.pdf). A URL interna é persistida em invoices.pdf_url para acesso permanente.' },
+        { type:'ext', arrow:'→', target:'Nuvem Fiscal', badge:'EXTERNA',
+          desc:'Emite, consulta e cancela NFS-e via API REST. Em caso de falha, o Outbox de emissão reprocessa com backoff exponencial até 5 tentativas antes de publicar InvoiceFailed.' },
+        { type:'event', arrow:'←', target:'assine.payment.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Consome PaymentConfirmed para disparar a emissão da NFS-e. A idempotência é garantida por índice único em payment_id.' },
+        { type:'event', arrow:'→', target:'assine.invoice.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Publica InvoiceIssued (com URL do PDF) e InvoiceFailed (alerta para o admin) após o resultado da emissão.' }
+      ]
+    },
+    'n-not': {
+      icon: '📧', title: 'assine-notifications', sub: ':8084 · SendGrid · Lotes de 50 · Scheduler',
+      iconBg: '#0078d4',
+      connections: [
+        { type:'sync', arrow:'→', target:'assine-content :8087', badge:'SYNC',
+          desc:'Busca o conteúdo da newsletter do dia (GET /content/today) às 7h para orquestrar o envio.' },
+        { type:'sync', arrow:'→', target:'assine-access :8083', badge:'SYNC',
+          desc:'Busca a lista de assinantes com acesso ativo (GET /access/subscribers) antes do envio da newsletter.' },
+        { type:'sync', arrow:'→', target:'assine-subscriptions :8081', badge:'SYNC',
+          desc:'Busca os emails dos assinantes por lista de IDs (GET /users/emails). O email é dado do contexto de assinaturas — não é duplicado no serviço de notificações.' },
+        { type:'ext', arrow:'→', target:'SendGrid', badge:'EXTERNA',
+          desc:'Envia emails transacionais em lotes de 50 (parallelStream). Falha individual não aborta o lote — cada envio é registrado como SENT ou FAILED no notification_history.' },
+        { type:'event', arrow:'←', target:'assine.payment.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Consome PaymentConfirmed e PaymentFailed para notificar o usuário sobre o status do pagamento.' },
+        { type:'event', arrow:'←', target:'assine.subscription.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Consome todos os eventos de assinatura (Activated, Canceled, PastDue, Reactivated) para enviar emails correspondentes.' },
+        { type:'event', arrow:'←', target:'assine.invoice.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Consome InvoiceIssued para enviar o PDF da NFS-e por email e InvoiceFailed para alertar o admin.' },
+        { type:'event', arrow:'←', target:'assine.auth.* (RabbitMQ)', badge:'EVENTO',
+          desc:'Consome MagicLinkRequested para enviar o email com o link de autenticação ao usuário.' }
+      ]
+    },
+    'n-minio': {
+      icon: '🗄️', title: 'MinIO', sub: ':9000 · S3-compatível · Bucket: invoices',
+      iconBg: '#1e3a5f',
+      connections: [
+        { type:'sync', arrow:'←', target:'assine-fiscal :8085', badge:'SYNC',
+          desc:'Recebe upload dos PDFs de NFS-e após emissão. Chave: invoices/{invoiceId}.pdf. O SDK oficial do MinIO (io.minio:minio:8.5.7) é usado com a porta InvoiceStorageGateway.' },
+        { type:'http', arrow:'→', target:'Console Web :9001', badge:'HTTP',
+          desc:'Interface web para visualizar e gerenciar os arquivos armazenados durante o desenvolvimento local.' }
+      ]
+    },
+    'n-q1': {
+      icon: '📨', title: 'assine.payment.*', sub: 'RabbitMQ · Exchange: assine.events (topic)',
+      iconBg: '#92400e',
+      connections: [
+        { type:'event', arrow:'←', target:'assine-billing :8082', badge:'PUBLICA',
+          desc:'Publica PaymentConfirmed, PaymentFailed, ChargebackOpened e SubscriptionRefundRequested via Outbox Pattern.' },
+        { type:'event', arrow:'→', target:'assine-subscriptions :8081', badge:'CONSOME',
+          desc:'Consome PaymentConfirmed para ativar a assinatura e PaymentFailed para marcar como PAST_DUE.' },
+        { type:'event', arrow:'→', target:'assine-fiscal :8085', badge:'CONSOME',
+          desc:'Consome PaymentConfirmed para disparar a emissão automática da NFS-e.' },
+        { type:'event', arrow:'→', target:'assine-notifications :8084', badge:'CONSOME',
+          desc:'Consome PaymentConfirmed e PaymentFailed para enviar emails de status de pagamento ao usuário.' }
+      ]
+    },
+    'n-q2': {
+      icon: '📬', title: 'assine.subscription.*', sub: 'RabbitMQ · Exchange: assine.events (topic)',
+      iconBg: '#92400e',
+      connections: [
+        { type:'event', arrow:'←', target:'assine-subscriptions :8081', badge:'PUBLICA',
+          desc:'Publica SubscriptionCreated, Activated, Canceled, PastDue, Reactivated e CancellationScheduled.' },
+        { type:'event', arrow:'→', target:'assine-access :8083', badge:'CONSOME',
+          desc:'Consome Activated (cria AccessPermission) e Canceled/PastDue (revoga acesso).' },
+        { type:'event', arrow:'→', target:'assine-billing :8082', badge:'CONSOME',
+          desc:'Consome SubscriptionRefundRequested para processar o reembolso no Stripe e cancelar a recorrência.' },
+        { type:'event', arrow:'→', target:'assine-notifications :8084', badge:'CONSOME',
+          desc:'Consome todos os eventos para enviar emails correspondentes ao ciclo de vida da assinatura.' }
+      ]
+    },
+    'n-q3': {
+      icon: '🧾', title: 'assine.invoice.*', sub: 'RabbitMQ · Exchange: assine.events (topic)',
+      iconBg: '#92400e',
+      connections: [
+        { type:'event', arrow:'←', target:'assine-fiscal :8085', badge:'PUBLICA',
+          desc:'Publica InvoiceIssued (com URL do PDF no MinIO) e InvoiceFailed (após 5 tentativas sem sucesso).' },
+        { type:'event', arrow:'→', target:'assine-notifications :8084', badge:'CONSOME',
+          desc:'Consome InvoiceIssued para enviar o PDF por email ao assinante e InvoiceFailed para alertar o administrador.' }
+      ]
+    },
+    'n-q4': {
+      icon: '🔗', title: 'assine.auth.*', sub: 'RabbitMQ · Exchange: assine.events (topic)',
+      iconBg: '#92400e',
+      connections: [
+        { type:'event', arrow:'←', target:'assine-auth :8086', badge:'PUBLICA',
+          desc:'Publica MagicLinkRequested após gerar e persistir o token de autenticação (UUID criptográfico, expiração de 15 min).' },
+        { type:'event', arrow:'→', target:'assine-notifications :8084', badge:'CONSOME',
+          desc:'Consome MagicLinkRequested para enviar o email com o link de login ao usuário.' }
+      ]
+    },
+    'n-stripe': {
+      icon: '💳', title: 'Stripe', sub: 'Cartão · Pix · Webhooks HMAC-SHA256',
+      iconBg: '#6d28d9',
+      connections: [
+        { type:'ext', arrow:'←', target:'assine-billing :8082', badge:'CHAMADA',
+          desc:'Recebe chamadas para criar PaymentIntents (cartão), gerar cobranças Pix, processar reembolsos e cancelar assinaturas.' },
+        { type:'ext', arrow:'→', target:'assine-billing :8082 (webhook)', badge:'WEBHOOK',
+          desc:'Envia webhooks assinados com HMAC-SHA256: invoice.payment_succeeded, invoice.payment_failed, invoice.payment_action_required, charge.dispute.created, charge.refund.updated, customer.subscription.deleted.' }
+      ]
+    },
+    'n-google': {
+      icon: '🔑', title: 'Google OAuth2', sub: 'openid · email · profile · UserInfo API',
+      iconBg: '#1565c0',
+      connections: [
+        { type:'ext', arrow:'←', target:'assine-auth :8086', badge:'CHAMADA',
+          desc:'Recebe o authorization code via callback e troca por access token. A UserInfo API retorna email (verificado) e nome do usuário para o account linking.' }
+      ]
+    },
+    'n-sendgrid': {
+      icon: '📧', title: 'SendGrid', sub: 'Transactional Email · Templates · Bulk',
+      iconBg: '#0f766e',
+      connections: [
+        { type:'ext', arrow:'←', target:'assine-notifications :8084', badge:'CHAMADA',
+          desc:'Recebe requisições de envio de email em lotes de até 50. Cada envio é individual — falha em um não aborta o lote. Resultado registrado no notification_history.' }
+      ]
+    },
+    'n-notion': {
+      icon: '📓', title: 'Notion API', sub: 'Database · Blocos · Conteúdo da newsletter',
+      iconBg: '#374151',
+      connections: [
+        { type:'ext', arrow:'←', target:'assine-content :8087', badge:'CHAMADA',
+          desc:'Recebe consultas ao Database configurado filtrando por Date = hoje e Status = Pronto. Os blocos da página (paragraph, headings, listas) são convertidos para HTML.' }
+      ]
+    },
+    'n-nuvem': {
+      icon: '🧾', title: 'Nuvem Fiscal', sub: 'NFS-e · REST API · Sandbox',
+      iconBg: '#7e22ce',
+      connections: [
+        { type:'ext', arrow:'←', target:'assine-fiscal :8085', badge:'CHAMADA',
+          desc:'Recebe chamadas para emitir, consultar e cancelar NFS-e. Abstrai a complexidade de cada prefeitura (SOAP, certificados digitais). Em caso de falha, o Outbox de emissão reprocessa com backoff exponencial.' }
+      ]
+    }
+  };
+
+  // ═══════════════════════════════════════════════
+  // DIALOG
+  // ═══════════════════════════════════════════════
+  const TYPE_LABEL = { http:'HTTP', event:'Evento', sync:'Sync', ext:'Externa' };
+  const TYPE_BADGE = { http:'badge-http', event:'badge-event', sync:'badge-sync', ext:'badge-ext' };
+  const TYPE_TITLE_CLASS = { http:'http', event:'event', sync:'sync', ext:'ext' };
+  const TYPE_ICON  = { http:'🔵', event:'🟠', sync:'🟢', ext:'🟣' };
+  const SECTION_TITLES = {
+    http:  '🔵 Conexões HTTP (via Gateway)',
+    event: '🟠 Eventos (RabbitMQ)',
+    sync:  '🟢 HTTP Interno (Síncrono)',
+    ext:   '🟣 Integrações Externas'
+  };
+
+  let activeNode = null;
+
+  function openDialog(nodeId) {
+    const data = NODE_DATA[nodeId];
+    if (!data) return;
+
+    // highlight active node
+    if (activeNode) document.getElementById(activeNode)?.classList.remove('active');
+    activeNode = nodeId;
+    document.getElementById(nodeId)?.classList.add('active');
+
+    // populate header
+    const iconEl = document.getElementById('d-icon');
+    iconEl.textContent = data.icon;
+    iconEl.style.background = data.iconBg;
+
+    document.getElementById('d-title').textContent = data.title;
+    document.getElementById('d-sub').textContent = data.sub;
+
+    // group connections by type
+    const groups = {};
+    for (const conn of data.connections) {
+      if (!groups[conn.type]) groups[conn.type] = [];
+      groups[conn.type].push(conn);
+    }
+
+    // build body
+    const body = document.getElementById('d-body');
+    body.innerHTML = '';
+
+    const order = ['http','sync','event','ext'];
+    for (const type of order) {
+      if (!groups[type]) continue;
+      const section = document.createElement('div');
+      section.className = 'conn-section';
+
+      const title = document.createElement('div');
+      title.className = `conn-section-title ${TYPE_TITLE_CLASS[type]}`;
+      title.textContent = SECTION_TITLES[type];
+      section.appendChild(title);
+
+      for (const conn of groups[type]) {
+        const item = document.createElement('div');
+        item.className = 'conn-item';
+        item.innerHTML = `
+          <div class="conn-arrow">${conn.arrow === '→' ? '→' : conn.arrow === '←' ? '←' : '↔'}</div>
+          <div class="conn-text">
+            <div class="conn-target">
+              ${conn.target}
+              <span class="badge ${TYPE_BADGE[type]}">${conn.badge}</span>
+            </div>
+            <div class="conn-desc">${conn.desc}</div>
+          </div>`;
+        section.appendChild(item);
+      }
+      body.appendChild(section);
+    }
+
+    document.getElementById('dialog-overlay').classList.add('open');
+  }
+
+  function closeDialog() {
+    document.getElementById('dialog-overlay').classList.remove('open');
+    if (activeNode) {
+      document.getElementById(activeNode)?.classList.remove('active');
+      activeNode = null;
+    }
+  }
+
+  document.getElementById('d-close').addEventListener('click', closeDialog);
+  document.getElementById('dialog-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('dialog-overlay')) closeDialog();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDialog(); });
+
+  // attach click to all nodes
+  window.addEventListener('load', () => {
+    for (const id of Object.keys(NODE_DATA)) {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', () => openDialog(id));
+    }
+  });
+
+  // ═══════════════════════════════════════════════
+  // DRAW LINES
+  // ═══════════════════════════════════════════════
+  function center(id) {
+    const canvas = document.getElementById('canvas');
+    const el = document.getElementById(id);
+    const cr = canvas.getBoundingClientRect();
+    const er = el.getBoundingClientRect();
+    return { x: er.left - cr.left + er.width/2, y: er.top - cr.top + er.height/2 };
+  }
+
+  function addArrow(svg, defs, id, color) {
+    const m = document.createElementNS('http://www.w3.org/2000/svg','marker');
+    m.setAttribute('id', id);
+    m.setAttribute('markerWidth','8'); m.setAttribute('markerHeight','8');
+    m.setAttribute('refX','6'); m.setAttribute('refY','3');
+    m.setAttribute('orient','auto');
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d','M0,0 L0,6 L8,3 z');
+    path.setAttribute('fill', color);
+    m.appendChild(path); defs.appendChild(m);
+  }
+
+  function line(svg, x1,y1,x2,y2, cls) {
+    const dx = (x2-x1)*0.45, dy = (y2-y1)*0.45;
+    let cx1,cy1,cx2,cy2;
+    if (Math.abs(x2-x1) > Math.abs(y2-y1)) {
+      cx1=x1+dx; cy1=y1; cx2=x2-dx; cy2=y2;
+    } else {
+      cx1=x1; cy1=y1+dy; cx2=x2; cy2=y2-dy;
+    }
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d',`M${x1},${y1} C${cx1},${cy1} ${cx2},${cy2} ${x2},${y2}`);
+    p.setAttribute('class', cls);
+    svg.appendChild(p);
+  }
+
+  function draw() {
+    const svg = document.getElementById('lines');
+    svg.innerHTML = '';
+    const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+    addArrow(svg, defs, 'arrowBlue',  '#2a6aaa');
+    addArrow(svg, defs, 'arrowAmber', '#7a5000');
+    addArrow(svg, defs, 'arrowGreen', '#1a5530');
+    addArrow(svg, defs, 'arrowPurple','#5b21b6');
+    svg.appendChild(defs);
+
+    const c = id => center(id);
+
+    line(svg, ...Object.values(c('n-client')),  ...Object.values(c('n-gateway')), 'line-http');
+    line(svg, ...Object.values(c('n-gateway')), ...Object.values(c('n-auth')),    'line-http');
+    line(svg, ...Object.values(c('n-gateway')), ...Object.values(c('n-sub')),     'line-http');
+    line(svg, ...Object.values(c('n-gateway')), ...Object.values(c('n-bill')),    'line-http');
+    line(svg, ...Object.values(c('n-gateway')), ...Object.values(c('n-acc')),     'line-http');
+    line(svg, ...Object.values(c('n-gateway')), ...Object.values(c('n-fis')),     'line-http');
+
+    line(svg, ...Object.values(c('n-not')),  ...Object.values(c('n-cont')),  'line-sync');
+    line(svg, ...Object.values(c('n-not')),  ...Object.values(c('n-acc')),   'line-sync');
+    line(svg, ...Object.values(c('n-not')),  ...Object.values(c('n-sub')),   'line-sync');
+    line(svg, ...Object.values(c('n-fis')),  ...Object.values(c('n-sub')),   'line-sync');
+    line(svg, ...Object.values(c('n-bill')), ...Object.values(c('n-sub')),   'line-sync');
+    line(svg, ...Object.values(c('n-fis')),  ...Object.values(c('n-minio')), 'line-sync');
+
+    line(svg, ...Object.values(c('n-bill')), ...Object.values(c('n-q1')), 'line-event');
+    line(svg, ...Object.values(c('n-sub')),  ...Object.values(c('n-q2')), 'line-event');
+    line(svg, ...Object.values(c('n-fis')),  ...Object.values(c('n-q3')), 'line-event');
+    line(svg, ...Object.values(c('n-auth')), ...Object.values(c('n-q4')), 'line-event');
+
+    line(svg, ...Object.values(c('n-q1')), ...Object.values(c('n-sub')),  'line-event');
+    line(svg, ...Object.values(c('n-q1')), ...Object.values(c('n-fis')),  'line-event');
+    line(svg, ...Object.values(c('n-q1')), ...Object.values(c('n-not')),  'line-event');
+    line(svg, ...Object.values(c('n-q2')), ...Object.values(c('n-acc')),  'line-event');
+    line(svg, ...Object.values(c('n-q2')), ...Object.values(c('n-bill')), 'line-event');
+    line(svg, ...Object.values(c('n-q2')), ...Object.values(c('n-not')),  'line-event');
+    line(svg, ...Object.values(c('n-q3')), ...Object.values(c('n-not')),  'line-event');
+    line(svg, ...Object.values(c('n-q4')), ...Object.values(c('n-not')),  'line-event');
+
+    function extLine(a,b) {
+      const A=c(a), B=c(b);
+      const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+      const dx=(B.x-A.x)*0.45;
+      p.setAttribute('d',`M${A.x},${A.y} C${A.x+dx},${A.y} ${B.x-dx},${B.y} ${B.x},${B.y}`);
+      p.setAttribute('stroke','#5b21b6'); p.setAttribute('stroke-width','1.5');
+      p.setAttribute('fill','none'); p.setAttribute('stroke-dasharray','4,3');
+      p.setAttribute('marker-end','url(#arrowPurple)');
+      svg.appendChild(p);
+    }
+    extLine('n-bill', 'n-stripe');
+    extLine('n-auth', 'n-google');
+    extLine('n-not',  'n-sendgrid');
+    extLine('n-cont', 'n-notion');
+    extLine('n-fis',  'n-nuvem');
+  }
+
+  window.addEventListener('load', () => { setTimeout(draw, 80); });
+  window.addEventListener('resize', draw);
+</script>
+</body>
+</html>
