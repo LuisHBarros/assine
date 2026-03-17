@@ -1,4 +1,5 @@
 -- Usuários autenticados
+```
 CREATE TABLE auth_users (
     id          UUID PRIMARY KEY,
     email       VARCHAR(255) NOT NULL UNIQUE,
@@ -7,10 +8,10 @@ CREATE TABLE auth_users (
     created_at  TIMESTAMP NOT NULL,
     last_login  TIMESTAMP
 );
-
-CREATE INDEX idx_auth_users_email ON auth_users(email);
 CREATE INDEX idx_auth_users_role ON auth_users(role);
-
+CREATE INDEX idx_auth_users_email ON auth_users(email);
+```
+```
 -- Tokens de magic link
 CREATE TABLE magic_tokens (
     id          UUID PRIMARY KEY,
@@ -23,6 +24,7 @@ CREATE TABLE magic_tokens (
 
 CREATE INDEX idx_magic_tokens_token ON magic_tokens(token);
 CREATE INDEX idx_magic_tokens_expires_at ON magic_tokens(expires_at);
+```
 
 Job de limpeza diário (via scheduler):
 ```
