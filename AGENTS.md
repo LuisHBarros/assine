@@ -144,3 +144,7 @@ Example: `br.com.assine.subscriptions.domain.model.Subscription`
 5. All HTTP calls between services go through gateway
 6. Correlation ID must be propagated throughout request chain
 7. Logs must be structured JSON with correlation ID
+
+
+## Constraint Rules
+- Create multiple AGENTS.md, in each folder, explaining the ideia of his files.
