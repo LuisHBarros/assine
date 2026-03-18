@@ -8,6 +8,8 @@ Plataforma de assinaturas de newsletter construída com microserviços em Java/S
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
 ![Docker](https://img.shields.io/badge/Docker-blue)
 
+> Runtime status: the root Docker Compose stack currently starts `assine-auth`, `assine-billing`, RabbitMQ, PostgreSQL, Prometheus, Grafana, and Zipkin. See `docs/INFRA.md` for the simple infra overview.
+
 ## Sobre o projeto
 
 O Assine é uma plataforma de assinaturas de newsletter com foco em arquitetura de software. O objetivo do projeto é demonstrar a aplicação prática de DDD, arquitetura hexagonal, comunicação assíncrona orientada a eventos e boas práticas de engenharia de software em um domínio de negócio real.
