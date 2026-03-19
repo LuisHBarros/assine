@@ -1,0 +1,40 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: assine-content
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:assine}
+    password: ${RABBITMQ_PASS:assine}
+
+app:
+  newsletter:
+    cron: "0 0 7 * * *"
+  rabbitmq:
+    exchange: "assine.events"
+    routing-key: "assine.content.ready"
+
+notion:
+  api:
+    key: ${NOTION_API_KEY:change-me}
+  database:
+    id: ${NOTION_DATABASE_ID:change-me}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - [X-Correlation-ID: %X{correlationId}] - %msg%n"

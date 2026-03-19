@@ -4,6 +4,7 @@ import br.com.assine.auth.domain.model.AuthProvider;
 import br.com.assine.auth.domain.model.AuthUser;
 import br.com.assine.auth.domain.model.AuthUserId;
 import br.com.assine.auth.domain.model.MagicToken;
+import br.com.assine.auth.domain.model.TokenPair;
 import br.com.assine.auth.domain.model.UserRole;
 import br.com.assine.auth.domain.port.in.ValidateMagicLinkUseCase;
 import br.com.assine.auth.domain.port.out.AuthUserRepository;
@@ -32,7 +33,7 @@ public class ValidateMagicLinkService implements ValidateMagicLinkUseCase {
 
     @Override
     @Transactional
-    public String validate(String token) {
+    public TokenPair validate(String token) {
         MagicToken magicToken = magicTokenRepository.findByToken(token)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid token"));
 
@@ -73,6 +74,6 @@ public class ValidateMagicLinkService implements ValidateMagicLinkUseCase {
 
         AuthUser savedUser = authUserRepository.save(authUser);
 
-        return jwtTokenProvider.generateToken(savedUser);
+        return jwtTokenProvider.generateTokenPair(savedUser);
     }
 }

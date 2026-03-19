@@ -13,3 +13,33 @@ scrape_configs:
     static_configs:
       - targets:
           - billing:8082
+
+  - job_name: subscriptions
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - subscriptions:8081
+
+  - job_name: access
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - access:8083
+
+  - job_name: notifications
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - notifications:8084
+
+  - job_name: fiscal
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - fiscal:8085
+
+  - job_name: content
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - content:8087

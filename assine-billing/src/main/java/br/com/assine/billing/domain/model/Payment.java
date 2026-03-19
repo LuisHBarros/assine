@@ -56,6 +56,16 @@ public class Payment {
         this.status = PaymentStatus.FAILED;
     }
 
+    public void refund() {
+        if (this.status == PaymentStatus.REFUNDED) {
+            return; // Idempotent
+        }
+        if (this.status != PaymentStatus.CONFIRMED) {
+            throw new IllegalStateException("Only confirmed payments can be refunded");
+        }
+        this.status = PaymentStatus.REFUNDED;
+    }
+
     public PaymentId getId() { return id; }
     public UUID getSubscriptionId() { return subscriptionId; }
     public String getExternalId() { return externalId; }

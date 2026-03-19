@@ -16,12 +16,20 @@ Application containers:
 
 - `assine-auth`
 - `assine-billing`
+- `assine-subscriptions`
+- `assine-access`
+- `assine-notifications`
+- `assine-fiscal`
 
 Support containers:
 
 - RabbitMQ
 - PostgreSQL for auth
 - PostgreSQL for billing
+- PostgreSQL for subscriptions
+- PostgreSQL for access
+- PostgreSQL for fiscal
+- MinIO
 - Prometheus
 - Grafana
 - Zipkin
@@ -37,11 +45,6 @@ The frontend is optional because it still expects a gateway and some API routes 
 These folders are still architecture or partial implementation, not real deployable services:
 
 - `assine-gateway`
-- `assine-access`
-- `assine-notifications`
-- `assine-fiscal`
-
-`assine-subscriptions` exists as a Maven module with domain code, but it is not a runnable Spring Boot service yet.
 
 ## Why Compose is the right choice here
 
@@ -111,10 +114,19 @@ docker compose down
 
 - `8086` -> auth API
 - `8082` -> billing API
+- `8081` -> subscriptions API
+- `8083` -> access API
+- `8084` -> notifications API
+- `8085` -> fiscal API
 - `15672` -> RabbitMQ management UI
 - `5672` -> RabbitMQ AMQP
 - `5437` -> auth Postgres
 - `5434` -> billing Postgres
+- `5433` -> subscriptions Postgres
+- `5435` -> access Postgres
+- `5436` -> fiscal Postgres
+- `9000` -> MinIO API
+- `9001` -> MinIO console
 - `9090` -> Prometheus
 - `3001` -> Grafana
 - `9411` -> Zipkin
@@ -132,6 +144,14 @@ docker compose down
   Auth container build
 - [assine-billing/Dockerfile](C:\Users\luish\Documents\assine\assine-billing\Dockerfile)
   Billing container build
+- [assine-subscriptions/Dockerfile](C:\Users\luish\Documents\assine\assine-subscriptions\Dockerfile)
+  Subscriptions container build
+- [assine-access/Dockerfile](C:\Users\luish\Documents\assine\assine-access\Dockerfile)
+  Access container build
+- [assine-notifications/Dockerfile](C:\Users\luish\Documents\assine\assine-notifications\Dockerfile)
+  Notifications container build
+- [assine-fiscal/Dockerfile](C:\Users\luish\Documents\assine\assine-fiscal\Dockerfile)
+  Fiscal container build
 - [frontend/Dockerfile](C:\Users\luish\Documents\assine\frontend\Dockerfile)
   Optional frontend container build
 - [.env.example](C:\Users\luish\Documents\assine\.env.example)
@@ -163,13 +183,13 @@ The frontend exists and can be containerized, but it is ahead of the backend con
 
 That is why it is behind a Compose profile instead of being started by default.
 
-## What “done” means for the current infra
+## What "done" means for the current infra
 
 The infra is in a good state for this project if:
 
 - `docker compose config` is valid
 - the stack starts with one command
-- auth and billing have stable databases
+- auth, billing, subscriptions, access, and fiscal have stable databases
 - RabbitMQ is available
 - metrics and tracing tools are reachable
 - the runtime description matches the real codebase

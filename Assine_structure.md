@@ -187,14 +187,45 @@ assine/
     └── src/main/resources/
         └── application.yml
 
+├── assine-content/                     # Integração com Notion
+│   ├── src/main/java/br/com/assine/content/
+│   │   ├── domain/
+│   │   │   ├── model/
+│   │   │   │   └── NewsletterContent.java
+│   │   │   ├── event/
+│   │   │   │   └── ContentReadyEvent.java
+│   │   │   └── port/
+│   │   │       ├── in/
+│   │   │       │   ├── RetrieveContentUseCase.java
+│   │   │       │   └── TriggerNewsletterRetryUseCase.java
+│   │   │       └── out/
+│   │   │           ├── ContentSourcePort.java
+│   │   │           └── EventPublisherPort.java
+│   │   ├── application/
+│   │   │   └── service/
+│   │   │       └── ContentService.java
+│   │   └── adapter/
+│   │       ├── in/
+│   │       │   ├── web/
+│   │       │   │   └── ContentController.java
+│   │       │   └── scheduler/
+│   │       │       └── DailyNewsletterScheduler.java
+│   │       └── out/
+│   │           ├── notion/
+│   │           │   └── NotionAdapter.java
+│   │           └── messaging/
+│   │               └── RabbitMQEventPublisher.java
+│   └── src/main/resources/
+│       └── application.yml
+
 ├── assine-fiscal/                      # Emissão de NFS-e
 │   ├── src/main/java/br/com/assine/fiscal/
 │   │   │
 │   │   ├── domain/
 │   │   │   ├── model/
 │   │   │   │   ├── Invoice.java            # Agregado raiz
-│   │   │   │   ├── InvoiceId.java          # Value Object
-│   │   │   │   └── InvoiceStatus.java      # PENDING|ISSUED|FAILED|CANCELED
+│   │   │   │   ├── InvoiceStatus.java      # PENDING|ISSUED|FAILED|CANCELED
+│   │   │   │   └── InvoiceOutbox.java      # Para resiliência
 │   │   │   ├── event/
 │   │   │   │   ├── InvoiceIssued.java
 │   │   │   │   └── InvoiceFailed.java
@@ -205,12 +236,14 @@ assine/
 │   │   │           ├── InvoiceRepository.java
 │   │   │           ├── InvoiceOutboxRepository.java
 │   │   │           ├── FiscalGateway.java      # porta para emissor externo
-│   │   │           ├── InvoiceStorageGateway.java # porta para object storage
+│   │   │           ├── InvoiceStorageGateway.java # porta para S3/MinIO
+│   │   │           ├── SubscriptionGateway.java # porta para buscar dados do tomador
 │   │   │           └── DomainEventPublisher.java
 │   │   │
 │   │   ├── application/
 │   │   │   └── usecase/
-│   │   │       └── IssueInvoiceService.java
+│   │   │       ├── IssueInvoiceService.java
+│   │   │       └── InvoiceRetryJob.java    # Processa outbox com backoff exponencial
 │   │   │
 │   │   └── adapter/
 │   │       ├── in/
@@ -221,13 +254,17 @@ assine/
 │   │           │   ├── InvoiceJpaRepository.java
 │   │           │   ├── InvoiceEntity.java
 │   │           │   ├── InvoiceOutboxJpaRepository.java
-│   │           │   └── InvoiceOutboxEntity.java
+│   │           │   ├── InvoiceOutboxEntity.java
+│   │           │   ├── InvoicePersistenceAdapter.java
+│   │           │   └── InvoiceOutboxPersistenceAdapter.java
 │   │           ├── messaging/
-│   │           │   └── InvoiceOutboxPublisher.java
+│   │           │   └── InvoiceEventPublisherAdapter.java
 │   │           ├── fiscal/
 │   │           │   └── NuvemFiscalGatewayAdapter.java
-│   │           └── storage/
-│   │               └── MinIOStorageAdapter.java  # implementa InvoiceStorageGateway
+│   │           ├── storage/
+│   │           │   └── MinIOStorageAdapter.java  # via AWS SDK v2
+│   │           └── subscription/
+│   │               └── SubscriptionClientAdapter.java # via OpenFeign
 │   │
 │   └── src/main/resources/
 │       └── application.yml

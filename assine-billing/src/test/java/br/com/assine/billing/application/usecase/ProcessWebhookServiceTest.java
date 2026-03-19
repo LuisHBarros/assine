@@ -7,6 +7,7 @@ import br.com.assine.billing.domain.model.Payment;
 import br.com.assine.billing.domain.model.PaymentId;
 import br.com.assine.billing.domain.model.PaymentMethod;
 import br.com.assine.billing.domain.model.PaymentStatus;
+import br.com.assine.billing.domain.port.out.ChargebackRepository;
 import br.com.assine.billing.domain.port.out.OutboxRepository;
 import br.com.assine.billing.domain.port.out.PaymentGateway;
 import br.com.assine.billing.domain.port.out.PaymentRepository;
@@ -39,6 +40,9 @@ class ProcessWebhookServiceTest {
     private PaymentRepository paymentRepository;
 
     @Mock
+    private ChargebackRepository chargebackRepository;
+
+    @Mock
     private OutboxRepository outboxRepository;
 
     private ProcessWebhookService processWebhookService;
@@ -52,6 +56,7 @@ class ProcessWebhookServiceTest {
                 paymentGateway,
                 webhookEventRepository,
                 paymentRepository,
+                chargebackRepository,
                 outboxRepository
         );
     }
@@ -61,7 +66,7 @@ class ProcessWebhookServiceTest {
         String payload = "{}";
         String signature = "sig";
         when(paymentGateway.parseEvent(payload, signature))
-                .thenReturn(new PaymentGateway.ParsedWebhookEvent("evt-1", PaymentGateway.WebhookEventType.UNSUPPORTED, null, null));
+                .thenReturn(new PaymentGateway.ParsedWebhookEvent("evt-1", PaymentGateway.WebhookEventType.UNSUPPORTED, null, null, null, null, null));
 
         processWebhookService.process(payload, signature);
 
@@ -74,7 +79,7 @@ class ProcessWebhookServiceTest {
         String payload = "{}";
         String signature = "sig";
         when(paymentGateway.parseEvent(payload, signature))
-                .thenReturn(new PaymentGateway.ParsedWebhookEvent("evt-1", PaymentGateway.WebhookEventType.PAYMENT_CONFIRMED, null, null));
+                .thenReturn(new PaymentGateway.ParsedWebhookEvent("evt-1", PaymentGateway.WebhookEventType.PAYMENT_CONFIRMED, null, null, null, null, null));
         when(webhookEventRepository.exists("evt-1")).thenReturn(true);
 
         processWebhookService.process(payload, signature);
@@ -90,7 +95,7 @@ class ProcessWebhookServiceTest {
         Payment payment = new Payment(null, UUID.randomUUID(), "ext-1", new IdempotencyKey("idem-1"), 1000, PaymentMethod.CREDIT_CARD, PaymentStatus.PENDING, null, null);
         
         when(paymentGateway.parseEvent(payload, signature))
-                .thenReturn(new PaymentGateway.ParsedWebhookEvent("evt-1", PaymentGateway.WebhookEventType.PAYMENT_CONFIRMED, payment, null));
+                .thenReturn(new PaymentGateway.ParsedWebhookEvent("evt-1", PaymentGateway.WebhookEventType.PAYMENT_CONFIRMED, payment, null, null, null, null));
         when(webhookEventRepository.exists("evt-1")).thenReturn(false);
         when(paymentRepository.findByExternalId("ext-1")).thenReturn(Optional.empty());
         when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> {
@@ -119,7 +124,7 @@ class ProcessWebhookServiceTest {
         Payment existingPayment = Payment.create(new PaymentId(UUID.randomUUID()), UUID.randomUUID(), "ext-1", new IdempotencyKey("idem-1"), 1000, PaymentMethod.CREDIT_CARD);
         
         when(paymentGateway.parseEvent(payload, signature))
-                .thenReturn(new PaymentGateway.ParsedWebhookEvent("evt-1", PaymentGateway.WebhookEventType.PAYMENT_FAILED, existingPayment, "Card Declined"));
+                .thenReturn(new PaymentGateway.ParsedWebhookEvent("evt-1", PaymentGateway.WebhookEventType.PAYMENT_FAILED, existingPayment, null, "Card Declined", null, null));
         when(webhookEventRepository.exists("evt-1")).thenReturn(false);
         when(paymentRepository.findByExternalId("ext-1")).thenReturn(Optional.of(existingPayment));
         when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));

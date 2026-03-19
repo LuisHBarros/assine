@@ -8,12 +8,20 @@ The repository can currently start these application services with Docker Compos
 
 - `assine-auth`
 - `assine-billing`
+- `assine-subscriptions`
+- `assine-access`
+- `assine-notifications`
+- `assine-fiscal`
 
 Supporting infrastructure started by Compose:
 
 - RabbitMQ
 - PostgreSQL for auth
 - PostgreSQL for billing
+- PostgreSQL for subscriptions
+- PostgreSQL for access
+- PostgreSQL for fiscal
+- MinIO
 - Prometheus
 - Grafana
 - Zipkin
@@ -29,11 +37,6 @@ The frontend is not part of the default stack because it still assumes a gateway
 These folders do not currently contain runnable Spring Boot services:
 
 - `assine-gateway`
-- `assine-access`
-- `assine-notifications`
-- `assine-fiscal`
-
-`assine-subscriptions` currently contains domain code and a Maven module, but it does not yet have an application bootstrap or runtime resources, so it is not part of the Compose stack.
 
 ## Commands
 
@@ -59,10 +62,19 @@ docker compose down
 
 - `auth`: `8086`
 - `billing`: `8082`
+- `subscriptions`: `8081`
+- `access`: `8083`
+- `notifications`: `8084`
+- `fiscal`: `8085`
 - `rabbitmq`: `5672`
 - `rabbitmq management`: `15672`
 - `postgres-auth`: `5437`
 - `postgres-billing`: `5434`
+- `postgres-subscriptions`: `5433`
+- `postgres-access`: `5435`
+- `postgres-fiscal`: `5436`
+- `minio api`: `9000`
+- `minio console`: `9001`
 - `prometheus`: `9090`
 - `grafana`: `3001`
 - `zipkin`: `9411`

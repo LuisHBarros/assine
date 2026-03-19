@@ -3,6 +3,7 @@ package br.com.assine.auth.application.usecase;
 import br.com.assine.auth.domain.model.AuthProvider;
 import br.com.assine.auth.domain.model.AuthUser;
 import br.com.assine.auth.domain.model.MagicToken;
+import br.com.assine.auth.domain.model.TokenPair;
 import br.com.assine.auth.domain.port.out.AuthUserRepository;
 import br.com.assine.auth.domain.port.out.JwtTokenProvider;
 import br.com.assine.auth.domain.port.out.MagicLinkEventPublisher;
@@ -36,12 +37,14 @@ class AuthServicesUnitTest {
     private RequestMagicLinkService requestService;
     private ValidateMagicLinkService validateService;
     private OAuthCallbackService oAuthService;
+    private RefreshTokenService refreshService;
 
     @BeforeEach
     void setUp() {
         requestService = new RequestMagicLinkService(magicTokenRepository, eventPublisher);
         validateService = new ValidateMagicLinkService(magicTokenRepository, authUserRepository, jwtTokenProvider);
         oAuthService = new OAuthCallbackService(authUserRepository, jwtTokenProvider, oAuthProvider);
+        refreshService = new RefreshTokenService(authUserRepository, jwtTokenProvider);
     }
 
     @Test
@@ -59,15 +62,16 @@ class AuthServicesUnitTest {
         String token = "valid-token";
         String email = "test@example.com";
         MagicToken magicToken = new MagicToken(UUID.randomUUID(), email, token, LocalDateTime.now().plusMinutes(10), false);
+        TokenPair mockTokenPair = new TokenPair("access", "refresh");
         
         when(magicTokenRepository.findByToken(token)).thenReturn(Optional.of(magicToken));
         when(authUserRepository.findByEmail(email)).thenReturn(Optional.empty());
         when(authUserRepository.save(any(AuthUser.class))).thenAnswer(i -> i.getArgument(0));
-        when(jwtTokenProvider.generateToken(any(AuthUser.class))).thenReturn("mock-jwt");
+        when(jwtTokenProvider.generateTokenPair(any(AuthUser.class))).thenReturn(mockTokenPair);
 
-        String result = validateService.validate(token);
+        TokenPair result = validateService.validate(token);
 
-        assertThat(result).isEqualTo("mock-jwt");
+        assertThat(result).isEqualTo(mockTokenPair);
         verify(magicTokenRepository).save(argThat(MagicToken::used));
         
         ArgumentCaptor<AuthUser> userCaptor = ArgumentCaptor.forClass(AuthUser.class);
@@ -94,20 +98,39 @@ class AuthServicesUnitTest {
         String email = "existing@example.com";
         OAuthProvider.OAuthUserInfo userInfo = new OAuthProvider.OAuthUserInfo(email, "sub123");
         AuthUser existingUser = new AuthUser(null, email, AuthProvider.MAGIC_LINK, null, null);
+        TokenPair mockTokenPair = new TokenPair("oauth-access", "oauth-refresh");
         
         when(oAuthProvider.getUserInfo(code)).thenReturn(Optional.of(userInfo));
         when(authUserRepository.findByEmail(email)).thenReturn(Optional.of(existingUser));
         when(authUserRepository.save(any(AuthUser.class))).thenAnswer(i -> i.getArgument(0));
-        when(jwtTokenProvider.generateToken(any(AuthUser.class))).thenReturn("oauth-jwt");
+        when(jwtTokenProvider.generateTokenPair(any(AuthUser.class))).thenReturn(mockTokenPair);
 
-        String result = oAuthService.processCallback(code);
+        TokenPair result = oAuthService.processCallback(code);
 
-        assertThat(result).isEqualTo("oauth-jwt");
+        assertThat(result).isEqualTo(mockTokenPair);
         ArgumentCaptor<AuthUser> userCaptor = ArgumentCaptor.forClass(AuthUser.class);
         verify(authUserRepository).save(userCaptor.capture());
         
         // Should keep original provider but update login time
         assertThat(userCaptor.getValue().provider()).isEqualTo(AuthProvider.MAGIC_LINK);
         assertThat(userCaptor.getValue().lastLogin()).isNotNull();
+    }
+
+    @Test
+    void refreshToken_ShouldReturnNewTokenPair() {
+        String refreshToken = "valid-refresh";
+        String email = "test@example.com";
+        AuthUser user = new AuthUser(null, email, AuthProvider.GOOGLE, null, null);
+        TokenPair newTokenPair = new TokenPair("new-access", "new-refresh");
+
+        when(jwtTokenProvider.validateTokenAndGetEmail(refreshToken)).thenReturn(email);
+        when(authUserRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        when(authUserRepository.save(any(AuthUser.class))).thenAnswer(i -> i.getArgument(0));
+        when(jwtTokenProvider.generateTokenPair(any(AuthUser.class))).thenReturn(newTokenPair);
+
+        TokenPair result = refreshService.refresh(refreshToken);
+
+        assertThat(result).isEqualTo(newTokenPair);
+        verify(authUserRepository).save(any(AuthUser.class));
     }
 }

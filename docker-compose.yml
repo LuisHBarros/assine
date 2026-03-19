@@ -50,6 +50,72 @@ services:
       retries: 10
       start_period: 15s
 
+  postgres-subscriptions:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${SUBSCRIPTIONS_DB_NAME:-subscriptions}
+      POSTGRES_USER: ${SUBSCRIPTIONS_DB_USER:-assine}
+      POSTGRES_PASSWORD: ${SUBSCRIPTIONS_DB_PASS:-assine}
+    volumes:
+      - postgres_subscriptions_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SUBSCRIPTIONS_DB_USER:-assine} -d ${SUBSCRIPTIONS_DB_NAME:-subscriptions}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  postgres-access:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${ACCESS_DB_NAME:-access}
+      POSTGRES_USER: ${ACCESS_DB_USER:-assine}
+      POSTGRES_PASSWORD: ${ACCESS_DB_PASS:-assine}
+    volumes:
+      - postgres_access_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ACCESS_DB_USER:-assine} -d ${ACCESS_DB_NAME:-access}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  postgres-fiscal:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${FISCAL_DB_NAME:-fiscal}
+      POSTGRES_USER: ${FISCAL_DB_USER:-assine}
+      POSTGRES_PASSWORD: ${FISCAL_DB_PASS:-assine}
+    volumes:
+      - postgres_fiscal_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${FISCAL_DB_USER:-assine} -d ${FISCAL_DB_NAME:-fiscal}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  minio:
+    image: minio/minio:RELEASE.2024-08-29T01-43-32Z
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-assine}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-assine-secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   auth:
     build:
       context: ./assine-auth
@@ -117,6 +183,147 @@ services:
       retries: 10
       start_period: 30s
 
+  subscriptions:
+    build:
+      context: ./assine-subscriptions
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8081
+      DB_HOST: postgres-subscriptions
+      DB_PORT: 5432
+      DB_NAME: ${SUBSCRIPTIONS_DB_NAME:-subscriptions}
+      DB_USER: ${SUBSCRIPTIONS_DB_USER:-assine}
+      DB_PASS: ${SUBSCRIPTIONS_DB_PASS:-assine}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-assine}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-assine}
+    expose:
+      - "8081"
+    depends_on:
+      postgres-subscriptions:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  access:
+    build:
+      context: ./assine-access
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8083
+      DB_HOST: postgres-access
+      DB_PORT: 5432
+      DB_NAME: ${ACCESS_DB_NAME:-access}
+      DB_USER: ${ACCESS_DB_USER:-assine}
+      DB_PASS: ${ACCESS_DB_PASS:-assine}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-assine}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-assine}
+    expose:
+      - "8083"
+    depends_on:
+      postgres-access:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  fiscal:
+    build:
+      context: ./assine-fiscal
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8085
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-fiscal:5432/${FISCAL_DB_NAME:-fiscal}
+      SPRING_DATASOURCE_USERNAME: ${FISCAL_DB_USER:-assine}
+      SPRING_DATASOURCE_PASSWORD: ${FISCAL_DB_PASS:-assine}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      AWS_S3_ENDPOINT: http://minio:9000
+      AWS_S3_ACCESS_KEY: ${MINIO_ACCESS_KEY:-assine}
+      AWS_S3_SECRET_KEY: ${MINIO_SECRET_KEY:-assine-secret}
+      AWS_S3_BUCKET_NAME: invoices
+      NUVEM_FISCAL_CLIENT_ID: ${NUVEM_FISCAL_CLIENT_ID:-}
+      NUVEM_FISCAL_CLIENT_SECRET: ${NUVEM_FISCAL_CLIENT_SECRET:-}
+      NUVEM_FISCAL_ENVIRONMENT: sandbox
+      SUBSCRIPTION_SERVICE_URL: http://subscriptions:8081
+    expose:
+      - "8085"
+    depends_on:
+      postgres-fiscal:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8085/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  notifications:
+    build:
+      context: ./assine-notifications
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8084
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-assine}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-assine}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      SENDGRID_FROM_EMAIL: ${SENDGRID_FROM_EMAIL:-no-reply@assine.com.br}
+      SENDGRID_FROM_NAME: ${SENDGRID_FROM_NAME:-Assine}
+    expose:
+      - "8084"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8084/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  content:
+    build:
+      context: ./assine-content
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8087
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-assine}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-assine}
+      NOTION_API_KEY: ${NOTION_API_KEY:-}
+      NOTION_DATABASE_ID: ${NOTION_DATABASE_ID:-}
+    expose:
+      - "8087"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8087/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   prometheus:
     image: prom/prometheus:v2.55.1
     restart: unless-stopped
@@ -132,6 +339,14 @@ services:
       auth:
         condition: service_started
       billing:
+        condition: service_started
+      subscriptions:
+        condition: service_started
+      access:
+        condition: service_started
+      notifications:
+        condition: service_started
+      fiscal:
         condition: service_started
 
   grafana:
@@ -172,5 +387,9 @@ volumes:
   rabbitmq_data:
   postgres_auth_data:
   postgres_billing_data:
+  postgres_subscriptions_data:
+  postgres_access_data:
+  postgres_fiscal_data:
+  minio_data:
   prometheus_data:
   grafana_data:

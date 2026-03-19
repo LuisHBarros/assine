@@ -11,6 +11,18 @@ services:
     ports:
       - "5434:5432"
 
+  postgres-subscriptions:
+    ports:
+      - "5433:5432"
+
+  postgres-access:
+    ports:
+      - "5435:5432"
+
+  postgres-fiscal:
+    ports:
+      - "5436:5432"
+
   auth:
     ports:
       - "8086:8086"
@@ -18,3 +30,19 @@ services:
   billing:
     ports:
       - "8082:8082"
+
+  subscriptions:
+    ports:
+      - "8081:8081"
+
+  access:
+    ports:
+      - "8083:8083"
+
+  notifications:
+    ports:
+      - "8084:8084"
+
+  fiscal:
+    ports:
+      - "8085:8085"

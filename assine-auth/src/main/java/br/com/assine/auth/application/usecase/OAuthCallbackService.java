@@ -3,6 +3,7 @@ package br.com.assine.auth.application.usecase;
 import br.com.assine.auth.domain.model.AuthProvider;
 import br.com.assine.auth.domain.model.AuthUser;
 import br.com.assine.auth.domain.model.AuthUserId;
+import br.com.assine.auth.domain.model.TokenPair;
 import br.com.assine.auth.domain.model.UserRole;
 import br.com.assine.auth.domain.port.in.OAuthCallbackUseCase;
 import br.com.assine.auth.domain.port.out.AuthUserRepository;
@@ -31,7 +32,7 @@ public class OAuthCallbackService implements OAuthCallbackUseCase {
 
     @Override
     @Transactional
-    public String processCallback(String code) {
+    public TokenPair processCallback(String code) {
         OAuthProvider.OAuthUserInfo userInfo = oAuthProvider.getUserInfo(code)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid OAuth code or failed to fetch user info"));
 
@@ -55,6 +56,6 @@ public class OAuthCallbackService implements OAuthCallbackUseCase {
 
         AuthUser savedUser = authUserRepository.save(authUser);
 
-        return jwtTokenProvider.generateToken(savedUser);
+        return jwtTokenProvider.generateTokenPair(savedUser);
     }
 }
